@@ -10,28 +10,48 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout project
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - name: Restore the full Android project from existing ZIP
+        shell: bash
+        run: |
+          set -euxo pipefail
+          test -f HocusFocus_Android_ReadyToBuild.zip
+          mkdir -p /tmp/hocus-project
+          unzip -q HocusFocus_Android_ReadyToBuild.zip -d /tmp/hocus-project
+          cp -a /tmp/hocus-project/HocusFocus_Android_Project/app ./
+          cp /tmp/hocus-project/HocusFocus_Android_Project/build.gradle ./
+          cp /tmp/hocus-project/HocusFocus_Android_Project/settings.gradle ./
+          cp /tmp/hocus-project/HocusFocus_Android_Project/gradle.properties ./
+          test -f app/src/main/AndroidManifest.xml
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK Platform
+        shell: bash
+        run: |
+          export ANDROID_HOME="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          export ANDROID_SDK_ROOT="$ANDROID_HOME"
+          sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Install Android SDK
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
-
-      - uses: gradle/actions/setup-gradle@v4
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
-      - name: Build APK
-        run: gradle --no-daemon :app:assembleDebug
+      - name: Build installable APK
+        run: gradle --no-daemon --stacktrace :app:assembleDebug
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
           name: HocusFocus-debug-APK
           path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
