@@ -27,6 +27,20 @@ jobs:
           cp /tmp/hocus-project/HocusFocus_Android_Project/gradle.properties ./
           test -f app/src/main/AndroidManifest.xml
 
+      - name: Integrate v2 features and validate JavaScript
+        shell: bash
+        run: |
+          python3 scripts/apply-v2.py
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          s=Path('app/src/main/assets/www/index.html').read_text()
+          scripts=re.findall(r'<script(?:\\s[^>]*)?>(.*?)</script>',s,flags=re.S)
+          assert scripts, 'No JavaScript in Android page'
+          Path('/tmp/hocus-v2-syntax.js').write_text(scripts[-1])
+          PY
+          node --check /tmp/hocus-v2-syntax.js
+
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
